@@ -17,6 +17,8 @@ int calibationIndex = 0;
 
 SoftwareSerial mySerial(10, 11);
 
+boolean parking_is_available = true;
+
 void setup() {
   Serial.begin(9600); // Connection to PC
   mySerial.begin(9600); // Connection to ESP8266 
@@ -25,7 +27,7 @@ void setup() {
   
   pinMode(13, OUTPUT);
   digitalWrite(13, LOW);
-/*
+
   mySerial.println("AT+RST");
   WaitForReady(2000);
   mySerial.println("AT+CWMODE=1");
@@ -33,14 +35,13 @@ void setup() {
   mySerial.println("AT+RST");
   WaitForReady(2000);
   
-//  mySerial.println("AT+CWJAP=\"<ssid>\",\"<password>\"");
-  
+  mySerial.println("AT+CWJAP=\"<wifi_ssid>\",\"<wifi_password>\"");
+  /*
   if (WaitForOK(5000)) {
     digitalWrite(13, HIGH); // Connection succesful
     Serial.println("Connected to Wi-Fi network");
-  }
-  */
-  
+  } 
+ */ 
   
   Wire.begin(); // Start the I2C interface.
   compass = HMC5883L(); // Construct a new HMC5883 compass.
@@ -65,17 +66,38 @@ void loop() {
   float deviation = calculateDeviationFromAverage(currentZAxisValue, averageZAxisValue);
   
   Serial.println("Deviation: " + String(deviation) + " " + String(currentZAxisValue) + " " + String(averageZAxisValue));
-  /*
+  
   if (deviation > 5) {
     Serial.println("Parkeeplaats bezet");
-    //sendData(10.0);
+    setParkingAvailable(false);
   } else {
     Serial.println("Parkeeplaats vrij");
+    setParkingAvailable(true);
   } 
-  */
-  
-  delay(100); // sleep 10 seconds
+    
+  delay(1000); // sleep 10 seconds
 }
+
+void setParkingAvailable(boolean is_available) {
+  // Check if status had changed since last check
+  if (parking_is_available != is_available) {
+    if (is_available) {
+      sendStatusUpdate("true");
+    } else {
+      sendStatusUpdate("false");
+    }
+  }
+  
+  parking_is_available = is_available;
+}
+//
+//void sendAvailableToServer() {
+//  sendStatusUpdate("true");
+//}
+//
+//void sendNotAvailableToServer() {
+//  sendStatusUpdate("false");
+//}
 
 float calculateDeviationFromAverage(float value, float average) {
   float deviation = abs(value - average);
@@ -106,31 +128,54 @@ float calculateSensorAverage(float data[]) {
   return total / dataLength;
 }
 
-void sendData(float value) {
-  mySerial.println("AT+CIPSTART=\"TCP\",\"data.sparkfun.com\",80");
+void sendStatusUpdate(String data) {
+  String getRequest = "GET /api/set-status/1/" + data + " HTTP/1.0\r\n";
+  String getRequestHostname = "Hostname: <api_host>\r\n\r\n";
+  int requestLength = getRequest.length() + getRequestHostname.length();
+  
+  Serial.println("Starting get request: (" + String(requestLength) + ") " + getRequest + getRequestHostname);
+  
+  Serial.println("AT+CIPSTART=\"TCP\",\"<api_host>\",80");
+  mySerial.println("AT+CIPSTART=\"TCP\",\"<api_host>\",80");
+  delay(2000);
   WaitForOK(5000);
-  mySerial.println("AT+CIPSEND=123");
+  
+  Serial.println("AT+CIPSEND=" + requestLength);
+  mySerial.println("AT+CIPSEND=" + requestLength);
   WaitForOK(5000);
-  String getRequest = "GET /input/<public_key>?private_key=<private_key>&temp=" + String(value) + " HTTP/1.0\r\n";
+  
   mySerial.print(getRequest);
-  mySerial.print("Hostname: data.sparkfun.com\r\n\r\n");
-  WaitForOK(5000);
+  mySerial.print(getRequestHostname + "");
+//  while(! mySerial.available()) {
+//    mySerial.println();
+//  }
+  WaitForOK(10000);
+  
   mySerial.println("AT+CIPCLOSE");
   WaitForOK(5000);
 }
 
 boolean WaitForOK(long timeoutamount) {
-  return WaitForResponse("OK", timeoutamount);
+  Serial.setTimeout(timeoutamount);
+  return mySerial.find("OK");
+
+//  return WaitForResponse("OK", timeoutamount);
 }
 
 boolean WaitForReady(long timeoutamount) {
-  return WaitForResponse("ready", timeoutamount);
+  Serial.setTimeout(timeoutamount);
+  return mySerial.find("ready");
+  
+//  return WaitForResponse("ready", timeoutamount);
 }
-
+/*
 boolean WaitForResponse(String response, long timeoutamount) {
 //  Serial.setTimeout(timeoutamount);
 //  
-//  return Serial.find(response);
+//  char charBuf[50];
+//  response.toCharArray(charBuf, 50);
+//  return Serial.find("OK");
+  
   unsigned long timeout = millis() + timeoutamount;
   
   while (millis() <= timeout) {
@@ -147,3 +192,4 @@ boolean WaitForResponse(String response, long timeoutamount) {
   
   return false;
 }
+*/
