@@ -8,7 +8,7 @@ HMC5883L compass;
 
 int error = 0;
 
-char serialbuffer[1000];
+char serialbuffer[100];
 
 float calibrateX[10];
 float calibrateY[10];
@@ -35,7 +35,8 @@ void setup() {
   mySerial.println("AT+RST");
   WaitForReady(2000);
   
-  mySerial.println("AT+CWJAP=\"<wifi_ssid>\",\"<wifi_password>\"");
+  mySerial.println("AT+CWJAP=\"<ssid>\",\"<password>\"");
+  delay(2000);
   /*
   if (WaitForOK(5000)) {
     digitalWrite(13, HIGH); // Connection succesful
@@ -82,22 +83,22 @@ void setParkingAvailable(boolean is_available) {
   // Check if status had changed since last check
   if (parking_is_available != is_available) {
     if (is_available) {
-      sendStatusUpdate("true");
+      sendAvailableToServer();
     } else {
-      sendStatusUpdate("false");
+      sendNotAvailableToServer();
     }
   }
   
   parking_is_available = is_available;
 }
-//
-//void sendAvailableToServer() {
-//  sendStatusUpdate("true");
-//}
-//
-//void sendNotAvailableToServer() {
-//  sendStatusUpdate("false");
-//}
+
+void sendAvailableToServer() {
+  sendStatusUpdate("true");
+}
+
+void sendNotAvailableToServer() {
+  sendStatusUpdate("false");
+}
 
 float calculateDeviationFromAverage(float value, float average) {
   float deviation = abs(value - average);
@@ -129,53 +130,39 @@ float calculateSensorAverage(float data[]) {
 }
 
 void sendStatusUpdate(String data) {
-  String getRequest = "GET /api/set-status/1/" + data + " HTTP/1.0\r\n";
-  String getRequestHostname = "Hostname: <api_host>\r\n\r\n";
-  int requestLength = getRequest.length() + getRequestHostname.length();
+  // data.sparkfun.com/input/<public_key>?private_key=<private_key>&is_available=false
+  String getRequest = "GET /input/<public_key>?private_key=<private_key>&is_available=" + data + " HTTP/1.0\r\n";
+  getRequest += "Host: data.sparkfun.com\r\n\r\n";
+  int requestLength = getRequest.length();
   
-  Serial.println("Starting get request: (" + String(requestLength) + ") " + getRequest + getRequestHostname);
+  Serial.println("Starting get request: (" + String(requestLength) + ") " + getRequest);
   
-  Serial.println("AT+CIPSTART=\"TCP\",\"<api_host>\",80");
-  mySerial.println("AT+CIPSTART=\"TCP\",\"<api_host>\",80");
+  Serial.println("AT+CIPSTART=\"TCP\",\"data.sparkfun.com\",80");
+  mySerial.println("AT+CIPSTART=\"TCP\",\"data.sparkfun.com\",80");
   delay(2000);
   WaitForOK(5000);
   
-  Serial.println("AT+CIPSEND=" + requestLength);
-  mySerial.println("AT+CIPSEND=" + requestLength);
+  Serial.println("AT+CIPSEND=" + String(requestLength));
+  mySerial.println("AT+CIPSEND=" + String(requestLength));
   WaitForOK(5000);
   
-  mySerial.print(getRequest);
-  mySerial.print(getRequestHostname + "");
-//  while(! mySerial.available()) {
-//    mySerial.println();
-//  }
+  mySerial.println(getRequest);
   WaitForOK(10000);
   
   mySerial.println("AT+CIPCLOSE");
   WaitForOK(5000);
+ 
 }
 
 boolean WaitForOK(long timeoutamount) {
-  Serial.setTimeout(timeoutamount);
-  return mySerial.find("OK");
-
-//  return WaitForResponse("OK", timeoutamount);
+  return WaitForResponse("OK", timeoutamount);
 }
 
 boolean WaitForReady(long timeoutamount) {
-  Serial.setTimeout(timeoutamount);
-  return mySerial.find("ready");
-  
-//  return WaitForResponse("ready", timeoutamount);
+  return WaitForResponse("ready", timeoutamount);
 }
-/*
-boolean WaitForResponse(String response, long timeoutamount) {
-//  Serial.setTimeout(timeoutamount);
-//  
-//  char charBuf[50];
-//  response.toCharArray(charBuf, 50);
-//  return Serial.find("OK");
-  
+
+boolean WaitForResponse(String response, long timeoutamount) {  
   unsigned long timeout = millis() + timeoutamount;
   
   while (millis() <= timeout) {
@@ -192,4 +179,3 @@ boolean WaitForResponse(String response, long timeoutamount) {
   
   return false;
 }
-*/
