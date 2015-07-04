@@ -37,12 +37,11 @@ void setup() {
   
   mySerial.println("AT+CWJAP=\"<ssid>\",\"<password>\"");
   delay(2000);
-  /*
+  
   if (WaitForOK(5000)) {
     digitalWrite(13, HIGH); // Connection succesful
     Serial.println("Connected to Wi-Fi network");
-  } 
- */ 
+  }  
   
   Wire.begin(); // Start the I2C interface.
   compass = HMC5883L(); // Construct a new HMC5883 compass.
@@ -56,6 +55,7 @@ void setup() {
     Serial.println(compass.GetErrorText(error));
     
   calibrateSensor();
+  sendAvailableToServer();
 }
 
 void loop() {
@@ -130,27 +130,25 @@ float calculateSensorAverage(float data[]) {
 }
 
 void sendStatusUpdate(String data) {
-  // data.sparkfun.com/input/<public_key>?private_key=<private_key>&is_available=false
-  String getRequest = "GET /input/<public_key>?private_key=<private_key>&is_available=" + data + " HTTP/1.0\r\n";
-  getRequest += "Host: data.sparkfun.com\r\n\r\n";
+  String getRequest = "GET /api/set-status/1/" + data + " HTTP/1.0\r\n";
+  getRequest += "Host: <server_ip>\r\n\r\n";
   int requestLength = getRequest.length();
   
   Serial.println("Starting get request: (" + String(requestLength) + ") " + getRequest);
   
-  Serial.println("AT+CIPSTART=\"TCP\",\"data.sparkfun.com\",80");
-  mySerial.println("AT+CIPSTART=\"TCP\",\"data.sparkfun.com\",80");
-  delay(2000);
-  WaitForOK(5000);
+  Serial.println("AT+CIPSTART=\"TCP\",\"<server_ip>\",80");
+  mySerial.println("AT+CIPSTART=\"TCP\",\"<server_ip>\",80");
+  WaitForOK(1000);
   
   Serial.println("AT+CIPSEND=" + String(requestLength));
   mySerial.println("AT+CIPSEND=" + String(requestLength));
-  WaitForOK(5000);
+  WaitForOK(1000);
   
   mySerial.println(getRequest);
-  WaitForOK(10000);
+  WaitForOK(1000);
   
   mySerial.println("AT+CIPCLOSE");
-  WaitForOK(5000);
+  WaitForOK(1000);
  
 }
 
